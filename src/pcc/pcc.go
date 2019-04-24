@@ -6,61 +6,63 @@ package main
 
 import (
 	"bufio"
+	"crypto/md5"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"time"
-	"crypto/md5"
-	"strconv"
-	"math/rand"
 )
 
 const (
 	PORT        = 80
 	StopPattern = "\r\n\r\n"
 )
+
 type Config struct {
 	ID   string
 	Port int
 }
 type PointInfo struct {
-	ID   string
-	LocalAddr string
+	ID         string
+	LocalAddr  string
 	GlobalAddr string
-	Neighbors []string
+	Neighbors  []string
 }
 type CloudInfo struct {
-	ID   string
+	ID     string
 	Points []PointInfo
 }
 type StarInfo struct {
-    ID   string
-	LocalAddr string
+	ID         string
+	LocalAddr  string
 	GlobalAddr string
-	Clouds []CloudInfo
+	Clouds     []CloudInfo
 }
+
 func main() {
 	// 初始化
 	// id:=getHash()
-	currentPort:=PORT
+	currentPort := PORT
 	for {
-		log.Println("[INFO]","正在尝试侦听",currentPort,"端口...")
+		log.Println("[INFO]", "正在尝试侦听", currentPort, "端口...")
 		l, err := net.Listen("tcp", ":"+strconv.Itoa(currentPort))
 		if err != nil {
-			log.Println("[ERRO]",currentPort,"端口已被占用！")
-			currentPort+=1
+			log.Println("[ERRO]", currentPort, "端口已被占用！")
+			currentPort += 1
 			continue
-		}else {
+		} else {
 			defer l.Close()
 			for {
 				// 等待接入
-				log.Println("[INFO]","正在侦听",currentPort,"端口...")
+				log.Println("[INFO]", "正在侦听", currentPort, "端口...")
 				conn, err := l.Accept()
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Println("[FINE]",conn.LocalAddr(),"<==>",conn.RemoteAddr())
+				log.Println("[FINE]", conn.LocalAddr(), "<==>", conn.RemoteAddr())
 				// 在新的Go程里处理会话
 				// 循环返回到等待新接入，就可以用协程处理接入
 				go func(c net.Conn) {
@@ -69,32 +71,32 @@ func main() {
 					readwriter := bufio.NewReadWriter(reader, writer)
 					msg := ReadString(readwriter)
 					fmt.Println(msg)
-					WriteString(readwriter,msg)
+					WriteString(readwriter, msg)
 					c.Close()
-					log.Println("[INFO]","连接已关闭！")
+					log.Println("[INFO]", "连接已关闭！")
 				}(conn)
 			}
 		}
 	}
 }
 
-func Read(readwriter *bufio.ReadWriter)(p []byte)  {
+func Read(readwriter *bufio.ReadWriter) (p []byte) {
 	return
 }
-func Write(readwriter *bufio.ReadWriter,p []byte)  {
-	
+func Write(readwriter *bufio.ReadWriter, p []byte) {
+
 }
-func ReadString(readwriter *bufio.ReadWriter)(str string)  {
+func ReadString(readwriter *bufio.ReadWriter) (str string) {
 	raw_msg, _ := readwriter.ReadString('\n')
-	msg:=strings.Split(raw_msg, "\n")
+	msg := strings.Split(raw_msg, "\n")
 	return msg[0]
 }
-func WriteString(readwriter *bufio.ReadWriter,str string)  {
-	readwriter.WriteString(str+"\n")
+func WriteString(readwriter *bufio.ReadWriter, str string) {
+	readwriter.WriteString(str + "\n")
 	readwriter.Flush()
 }
-func getHash()(hash string)  {
-	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(),10))
+func getHash() (hash string) {
+	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(), 10))
 	h := strings.ToUpper(fmt.Sprintf("%x", md5.Sum(salt)))
 	return h
 }
