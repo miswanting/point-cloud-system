@@ -1,3 +1,7 @@
+// 1.建立Point
+// 2.连接Star
+// 3.连接Point
+// 4.连接Cloud
 package main
 
 import (
@@ -6,7 +10,10 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
+	"crypto/md5"
 	"strconv"
+	"math/rand"
 )
 
 const (
@@ -14,25 +21,25 @@ const (
 	StopPattern = "\r\n\r\n"
 )
 func main() {
+	// id:=getHash()
 	currentPort:=PORT
-
 	for {
-		fmt.Println("[INFO]","正在尝试侦听",currentPort,"端口...")
+		log.Println("[INFO]","正在尝试侦听",currentPort,"端口...")
 		l, err := net.Listen("tcp", ":"+strconv.Itoa(currentPort))
 		if err != nil {
-			fmt.Println("[ERRO]",currentPort,"端口已被占用！")
+			log.Println("[ERRO]",currentPort,"端口已被占用！")
 			currentPort+=1
 			continue
 		}else {
 			defer l.Close()
 			for {
 				// 等待接入
-				fmt.Println("[INFO]","正在侦听",currentPort,"端口...")
+				log.Println("[INFO]","正在侦听",currentPort,"端口...")
 				conn, err := l.Accept()
 				if err != nil {
 					log.Fatal(err)
 				}
-				fmt.Println("[FINE]","已通过",conn.LocalAddr(),"的地址接收到来自",conn.RemoteAddr(),"的连接！")
+				log.Println("[FINE]",conn.LocalAddr(),"<==>",conn.RemoteAddr())
 				// 在新的Go程里处理会话
 				// 循环返回到等待新接入，就可以用协程处理接入
 				go func(c net.Conn) {
@@ -43,17 +50,17 @@ func main() {
 					fmt.Println(msg)
 					WriteString(readwriter,msg)
 					c.Close()
-					fmt.Println("[INFO]","连接已关闭！")
+					log.Println("[INFO]","连接已关闭！")
 				}(conn)
 			}
 		}
 	}
 }
 
-func Read(readwriter *bufio.ReadWriter)(b []byte)  {
+func Read(readwriter *bufio.ReadWriter)(p []byte)  {
 	return
 }
-func Write(readwriter *bufio.ReadWriter,b []byte)  {
+func Write(readwriter *bufio.ReadWriter,p []byte)  {
 	
 }
 func ReadString(readwriter *bufio.ReadWriter)(str string)  {
@@ -64,4 +71,9 @@ func ReadString(readwriter *bufio.ReadWriter)(str string)  {
 func WriteString(readwriter *bufio.ReadWriter,str string)  {
 	readwriter.WriteString(str+"\n")
 	readwriter.Flush()
+}
+func getHash()(hash string)  {
+	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(),10))
+	h := strings.ToUpper(fmt.Sprintf("%x", md5.Sum(salt)))
+	return h
 }

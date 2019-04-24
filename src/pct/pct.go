@@ -1,3 +1,4 @@
+// 1.连接Point
 package main
 
 import (
@@ -6,15 +7,20 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+	"time"
+	"crypto/md5"
+	"strconv"
+	"math/rand"
 )
 
 func main() {
-	fmt.Println("[INFO]","正在拨号...")
+	// id:=getHash()
+	log.Println("[INFO]","正在拨号...")
 	conn, err := net.Dial("tcp", ":80")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("[FINE]","已通过",conn.LocalAddr(),"的地址连接到",conn.RemoteAddr(),"的主机！")
+	log.Println("[FINE]",conn.LocalAddr(),"<==>",conn.RemoteAddr())
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	readwriter := bufio.NewReadWriter(reader, writer)
@@ -38,4 +44,9 @@ func ReadString(readwriter *bufio.ReadWriter)(str string)  {
 func WriteString(readwriter *bufio.ReadWriter,str string)  {
 	readwriter.WriteString(str+"\n")
 	readwriter.Flush()
+}
+func getHash()(hash string)  {
+	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(),10))
+	h := strings.ToUpper(fmt.Sprintf("%x", md5.Sum(salt)))
+	return h
 }
