@@ -14,7 +14,8 @@ import (
 )
 
 func main() {
-	// id:=getHash()
+	id:=getHash()
+	log.Println(id)
 	log.Println("[INFO]","正在拨号...")
 	conn, err := net.Dial("tcp", ":80")
 	if err != nil {

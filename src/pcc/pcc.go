@@ -20,7 +20,28 @@ const (
 	PORT        = 80
 	StopPattern = "\r\n\r\n"
 )
+type Config struct {
+	ID   string
+	Port int
+}
+type PointInfo struct {
+	ID   string
+	LocalAddr string
+	GlobalAddr string
+	Neighbors []string
+}
+type CloudInfo struct {
+	ID   string
+	Points []PointInfo
+}
+type StarInfo struct {
+    ID   string
+	LocalAddr string
+	GlobalAddr string
+	Clouds []CloudInfo
+}
 func main() {
+	// 初始化
 	// id:=getHash()
 	currentPort:=PORT
 	for {
