@@ -120,13 +120,18 @@ func handleProxy(conn net.Conn) {
 	writer := bufio.NewWriter(conn)
 	readwriter := bufio.NewReadWriter(reader, writer)
 	msg := ReadString(readwriter)
-	if msg == "exit" {
-	} else {
-		logger.Println("[TEST]", "接收到Star信息：", msg, "进行反弹测试！")
-		WriteString(readwriter, msg)
+	for {
+		if msg == "exit" {
+			logger.Println("[INFO]", "Star-Point连接接收到关闭信号！")
+			break
+		} else {
+			logger.Println("[TEST]", "接收到Point信息：", msg, "进行反弹测试！")
+			WriteString(readwriter, msg)
+		}
 	}
+	WriteString(readwriter, "exit")
 	conn.Close()
-	logger.Println("[INFO]", "连接已关闭！")
+	logger.Println("[INFO]", "Star-Point连接受控关闭！")
 }
 func Read(readWriter *bufio.ReadWriter) (p []byte) {
 	// BUG

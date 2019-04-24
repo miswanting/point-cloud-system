@@ -170,14 +170,16 @@ func connectToStar() {
 	for {
 		msg := ReadString(StarRW)
 		if msg == "exit" {
+			logger.Println("[INFO]", "Point-Star连接接收到关闭信号！")
 			break
 		} else {
 			logger.Println("[TEST]", "接收到Star信息：", msg, "下载至App...")
 			WriteString(AppRW, msg)
 		}
 	}
+	WriteString(StarRW, "exit")
 	conn.Close()
-	logger.Println("[INFO]", "连接受控关闭！")
+	logger.Println("[INFO]", "Point-Star连接受控关闭！")
 }
 func handleMonitor(conn net.Conn) {
 	reader := bufio.NewReader(conn)
@@ -196,14 +198,16 @@ func handleProxy(conn net.Conn) {
 	for {
 		msg := ReadString(AppRW)
 		if msg == "exit" {
+			logger.Println("[INFO]", "Point-App连接接收到关闭信号！")
 			break
 		} else {
 			logger.Println("[TEST]", "接收到App信息：", msg, "上传至Star...")
 			WriteString(StarRW, msg)
 		}
 	}
+	WriteString(AppRW, "exit")
 	conn.Close()
-	logger.Println("[INFO]", "连接受控关闭！")
+	logger.Println("[INFO]", "Point-App连接受控关闭！")
 }
 func Read(readWriter *bufio.ReadWriter) (p []byte) {
 	// BUG
