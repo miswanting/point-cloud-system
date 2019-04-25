@@ -1,5 +1,5 @@
 @echo off
-title Point Cloud System(Tester)
+title Point Cloud System Tester
 set GOPATH=%cd%
-go run .\src\pct
+go run .\src\pcst
 pause
