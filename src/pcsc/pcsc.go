@@ -46,7 +46,7 @@ var (
 func init() { // 初始化
 	os.Remove(LogFile) // 删除记录文件（如果有）
 	// 设置记录文件
-	logFile, err := os.OpenFile(LogFile, os.O_CREATE, 0777)
+	logFile, err := os.OpenFile(LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		log.Println(err)
 	}

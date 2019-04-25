@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	defer logFile.Close()
+	// defer logFile.Close()
 	// 记录文件和控制台双通
 	w := io.MultiWriter(os.Stdout, logFile)
 	logger = log.New(w, "", log.LstdFlags)
