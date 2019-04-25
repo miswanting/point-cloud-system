@@ -116,7 +116,7 @@ func startClient() {
 	ClientPort := config.ClientPort
 	for {
 		logger.Println("[INFO]", "尝试在端口", ClientPort, "搭建控制台...")
-		l, err := net.Listen("tcp", ":"+strconv.Itoa(ClientPort))
+		l, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4zero, Port: ClientPort})
 		if err != nil {
 			logger.Println("[ERRO]", "控制台端口被占用！")
 			ClientPort += 1
@@ -142,7 +142,7 @@ func startProxyServer() {
 	ProxyPort = config.ProxyPort
 	for {
 		logger.Println("[INFO]", "尝试在端口", ProxyPort, "搭建代理服务器...")
-		l, err := net.Listen("tcp", ":"+strconv.Itoa(ProxyPort))
+		l, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4zero, Port: ProxyPort})
 		if err != nil {
 			logger.Println("[ERRO]", "代理服务器端口被占用！")
 			ProxyPort += 1
@@ -180,7 +180,10 @@ func connectToServer() {
 		"CMD": "signup",
 		"ID":  ID,
 	}
+	logger.Println(m)
 	WriteMap(UDProbe, m)
+	m = ReadMap(UDProbe)
+	logger.Println(m)
 }
 
 // func OLD_connectToStar() {

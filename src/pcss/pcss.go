@@ -111,24 +111,29 @@ func startServer() {
 	}
 }
 func handleConnection(l *net.UDPConn) {
-	reader := bufio.NewReader(l)
-	writer := bufio.NewWriter(l)
-	readwriter := bufio.NewReadWriter(reader, writer)
+	// reader := bufio.NewReader(l)
+	// writer := bufio.NewWriter(l)
+	// readwriter := bufio.NewReadWriter(reader, writer)
 	logger.Println("[INFO]", "Listening...")
+	var data []byte
 	for {
 		// 等待接入
-		m := ReadMap(readwriter)
-		if m["CMD"] == "close" {
-			logger.Println("[INFO]", "Star-Point Recieved Close Signal!")
-			break
-		} else {
-			logger.Println("[INFO]", "Recieved Request from Star:", m["CMD"])
-			if m["CMD"] == "signup" {
-				logger.Println("[INFO]", "Register Star ID:", m["ID"])
-			} else if m["CMD"] == "login" {
-				logger.Println("[INFO]", "Login User:", m["Username"])
-			}
+		_, remoteAddr, err := l.ReadFromUDP(data)
+		if err != nil {
+			logger.Fatal(err)
 		}
+		l.WriteToUDP(data, remoteAddr)
+		// if m["CMD"] == "close" {
+		// 	logger.Println("[INFO]", "Star-Point Recieved Close Signal!")
+		// 	break
+		// } else {
+		// 	logger.Println("[INFO]", "Recieved Request from Star:", m["CMD"])
+		// 	if m["CMD"] == "signup" {
+		// 		logger.Println("[INFO]", "Register Star ID:", m["ID"])
+		// 	} else if m["CMD"] == "login" {
+		// 		logger.Println("[INFO]", "Login User:", m["Username"])
+		// 	}
+		// }
 	}
 }
 
