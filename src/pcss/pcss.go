@@ -23,7 +23,7 @@ const (
 	LogFile           = "pcs.log"         // Log文件名
 	ConfigFile        = "pcs.config.json" // 配置文件名
 	DefaultID         = "auto"            // 默认ID（或生成方式）
-	DefaultServerPort = 1994              // 默认本地服务器端口
+	DefaultServerPort = 3478              // 默认本地服务器端口
 )
 
 var (
@@ -232,9 +232,10 @@ func getHash() (hash string) {
 }
 
 type Config struct {
-	ID         string // 本机ID
-	ServerPort int    // 本机ID
-	ProxyPort  int    // Port for Data Transfer
+	Mode       []string // 支持的服务模式："STUN":去中心化，消耗服务器资源低；"TURN":中心化，消耗服务器资源高；"ICE":智能模式
+	ID         string   // 本机ID
+	ServerPort int      // 本机ID
+	ProxyPort  int      // Port for Data Transfer
 }
 type PointInfo struct {
 	ID          string
@@ -242,6 +243,7 @@ type PointInfo struct {
 	GlobalPort  int
 	LocalAddr   string
 	LocalPort   int
+	NatType     string // NAT类型：完全锥形、限制锥形、端口限制锥形、对称
 	NeighborID1 string
 	NeighborID2 string
 	NeighborID3 string
