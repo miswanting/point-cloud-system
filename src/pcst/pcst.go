@@ -21,7 +21,9 @@ const (
 	LogFile      = "pct.log"
 	ConfigFile   = "pct.config.json"
 	ProxyAddress = "localhost"
-	ProxyPort    = 1996
+	ProxyPort    = 3480
+	Username     = "TestUsername"
+	Password     = "TestPassword"
 )
 
 var (
@@ -29,24 +31,31 @@ var (
 	config Config
 )
 
-func main() {
-	// 初始化
+func init() { // 初始化
 	os.Remove(LogFile) // 删除记录文件（如果有）
-	// 指定记录文件
-	logFile, err := os.OpenFile(LogFile, os.O_CREATE, 0777)
+	// 设置记录文件
+	logFile, err := os.OpenFile(LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		log.Println(err)
 	}
 	// defer logFile.Close()
-	// 记录文件和控制台双通
-	w := io.MultiWriter(os.Stdout, logFile)
-	logger = log.New(w, "", log.LstdFlags)
+	// 记录文件输出和控制台输出双通
+	mw := io.MultiWriter(os.Stdout, logFile)
+	logger = log.New(mw, "", log.LstdFlags)
+}
+func main() {
 	logger.Println("[HALO]", "Point Cloud System Tester", "[版本", Version+"]")
 	logger.Println("[HALO]", "欢迎使用点云测试程序！")
+	loadConfig()
+	startTester()
+}
+func loadConfig() {
 	// 处理配置文件
 	config = Config{
 		ProxyAddress: ProxyAddress,
 		ProxyPort:    ProxyPort,
+		Username:     Username,
+		Password:     Password,
 	}
 	logger.Println("[INFO]", "正在查找配置文件...")
 	if _, err := os.Stat(ConfigFile); err == nil {
@@ -78,7 +87,6 @@ func main() {
 	} else {
 		logger.Fatal(err)
 	}
-	startTester()
 }
 func startTester() {
 	logger.Println("[INFO]", "正在尝试连接点云客户端", config.ProxyAddress+":"+strconv.Itoa(config.ProxyPort), "...")

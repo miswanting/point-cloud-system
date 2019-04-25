@@ -36,27 +36,32 @@ var (
 func init() { // 初始化
 	os.Remove(LogFile) // 删除记录文件（如果有）
 	// 指定记录文件
-	logFile, err := os.OpenFile(LogFile, os.O_CREATE, 0777)
+	logFile, err := os.OpenFile(LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		log.Println(err)
 	}
 	// defer logFile.Close()
 	// 记录文件和控制台双通
-	w := io.MultiWriter(os.Stdout, logFile)
-	logger = log.New(w, "", log.LstdFlags)
+	mw := io.MultiWriter(os.Stdout, logFile)
+	logger = log.New(mw, "", log.LstdFlags)
 }
 func main() {
 	logger.Println("[HALO]", "Point Cloud System Server", "[Version", Version+"]")
-	logger.Println("[HALO]", "Welcome")
+	logger.Println("[HALO]", "Welcome to PCS Server!")
+	loadConfig()
+	logger.Println("[INFO]", "Current ID:", ID)
+	startServer()
+}
+func loadConfig() {
 	// 处理配置文件
 	config = Config{
 		ID:         DefaultID,
 		ServerPort: DefaultServerPort,
 	}
-	logger.Println("[INFO]", "正在查找配置文件...")
+	logger.Println("[INFO]", "Searching Config File...")
 	if _, err := os.Stat(ConfigFile); err == nil {
 		// 配置文件存在
-		logger.Println("[INFO]", "正在加载配置文件...")
+		logger.Println("[INFO]", "Loading Config File...")
 		f, err := os.Open(ConfigFile)
 		if err != nil {
 			logger.Fatal(err)
@@ -69,7 +74,7 @@ func main() {
 		// logger.Println(string(config.ID))
 	} else if os.IsNotExist(err) {
 		// 配置文件不存在
-		logger.Println("[INFO]", "正在创建配置文件...")
+		logger.Println("[INFO]", "Creating Config File...")
 		j, _ := json.MarshalIndent(config, "", "    ")
 		// logger.Println(string(j))
 		f, err := os.Create(ConfigFile)
@@ -89,22 +94,40 @@ func main() {
 	} else {
 		ID = config.ID
 	}
-	logger.Println("[INFO]", "使用ID:", ID)
-	// go startServer()
-	startServer()
 }
 func startServer() {
 	ServerPort = config.ServerPort
 	for {
-		logger.Println("[INFO]", "尝试在", ServerPort, "端口搭建代理服务器...")
+		logger.Println("[INFO]", "Trying to set Server Port on", ServerPort, "...")
 		l, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: ServerPort})
 		if err != nil {
-			logger.Println("[ERRO]", ServerPort, "代理服务器端口被占用！")
+			logger.Println("[ERRO]", "The Server Port is Now in use!")
 			ServerPort += 1
 			continue
 		} else {
 			defer l.Close()
-			handleProxy(l)
+			handleConnection(l)
+		}
+	}
+}
+func handleConnection(l *net.UDPConn) {
+	reader := bufio.NewReader(l)
+	writer := bufio.NewWriter(l)
+	readwriter := bufio.NewReadWriter(reader, writer)
+	logger.Println("[INFO]", "Listening...")
+	for {
+		// 等待接入
+		m := ReadMap(readwriter)
+		if m["CMD"] == "close" {
+			logger.Println("[INFO]", "Star-Point Recieved Close Signal!")
+			break
+		} else {
+			logger.Println("[INFO]", "Recieved Request from Star:", m["CMD"])
+			if m["CMD"] == "signup" {
+				logger.Println("[INFO]", "Register Star ID:", m["ID"])
+			} else if m["CMD"] == "login" {
+				logger.Println("[INFO]", "Login User:", m["Username"])
+			}
 		}
 	}
 }
@@ -135,52 +158,32 @@ func startServer() {
 // 		}
 // 	}
 // }
-func handleProxy(l *net.UDPConn) {
-	reader := bufio.NewReader(l)
-	writer := bufio.NewWriter(l)
-	readwriter := bufio.NewReadWriter(reader, writer)
-	for {
-		// 等待接入
-		logger.Println("[INFO]", "代理服务器侦听中...")
-		m := ReadMap(readwriter)
-		if m["CMD"] == "close" {
-			logger.Println("[INFO]", "Star-Point连接接收到关闭信号！")
-			break
-		} else {
-			logger.Println("[INFO]", "接收到Star请求：", m["CMD"])
-			if m["CMD"] == "signup" {
-				WriteMap(readwriter, m)
-			} else if m["CMD"] == "login" {
-				WriteMap(readwriter, m)
-			}
-		}
-	}
-}
-func handleConnection(conn net.Conn) {
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
-	readwriter := bufio.NewReadWriter(reader, writer)
-	for {
-		m := ReadMap(readwriter)
-		if m["CMD"] == "close" {
-			logger.Println("[INFO]", "Star-Point连接接收到关闭信号！")
-			break
-		} else {
-			logger.Println("[INFO]", "接收到Star请求：", m["CMD"])
-			if m["CMD"] == "signup" {
-				WriteMap(readwriter, m)
-			} else if m["CMD"] == "login" {
-				WriteMap(readwriter, m)
-			}
-		}
-	}
-	m := map[string]interface{}{
-		"CMD": "close",
-	}
-	WriteMap(readwriter, m)
-	conn.Close()
-	logger.Println("[INFO]", "Star-Point连接受控关闭！")
-}
+
+// func handleConnection(conn net.Conn) {
+// 	reader := bufio.NewReader(conn)
+// 	writer := bufio.NewWriter(conn)
+// 	readwriter := bufio.NewReadWriter(reader, writer)
+// 	for {
+// 		m := ReadMap(readwriter)
+// 		if m["CMD"] == "close" {
+// 			logger.Println("[INFO]", "Star-Point连接接收到关闭信号！")
+// 			break
+// 		} else {
+// 			logger.Println("[INFO]", "接收到Star请求：", m["CMD"])
+// 			if m["CMD"] == "signup" {
+// 				WriteMap(readwriter, m)
+// 			} else if m["CMD"] == "login" {
+// 				WriteMap(readwriter, m)
+// 			}
+// 		}
+// 	}
+// 	m := map[string]interface{}{
+// 		"CMD": "close",
+// 	}
+// 	WriteMap(readwriter, m)
+// 	conn.Close()
+// 	logger.Println("[INFO]", "Star-Point连接受控关闭！")
+// }
 func Str2Map(s string) (m map[string]interface{}) {
 	err := json.Unmarshal([]byte(s), &m)
 	if err != nil {

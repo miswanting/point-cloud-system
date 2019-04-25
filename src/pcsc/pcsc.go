@@ -26,9 +26,9 @@ const (
 	ConfigFile           = "pcc.config.json" // 配置文件名
 	DefaultID            = "auto"            // 默认ID（或生成方式）
 	DefaultServerAddress = "localhost"       // 默认服务器系统IP
-	DefaultServerPort    = 1995              // 默认服务器系统端口
-	DefaultSystemPort    = 80                // 默认本地系统端口
-	DefaultProxyPort     = 1996              // 默认本地代理端口
+	DefaultServerPort    = 3478              // 默认服务器系统端口
+	DefaultClientPort    = 3479              // 默认本地系统端口
+	DefaultProxyPort     = 3480              // 默认本地代理端口
 )
 
 var (
@@ -50,27 +50,27 @@ func init() { // 初始化
 	if err != nil {
 		log.Println(err)
 	}
-	defer logFile.Close()
+	// defer logFile.Close()
 	// 记录文件输出和控制台输出双通
-	w := io.MultiWriter(os.Stdout, logFile)
-	logger = log.New(w, "", log.LstdFlags)
+	mw := io.MultiWriter(os.Stdout, logFile)
+	logger = log.New(mw, "", log.LstdFlags)
 }
 func main() {
 	logger.Println("[HALO]", "Point Cloud System Client", "[版本", Version+"]")
 	logger.Println("[HALO]", "欢迎使用点云客户端！")
 	loadConfig()
-	logger.Println("[INFO]", "使用ID:", ID)
+	logger.Println("[INFO]", "当前ID:", ID)
 	// 尝试连接Star
-	go connectToStar()
+	go connectToServer()
 	// 启动代理服务器
-	go startProxy()
-	startSystem()
+	go startProxyServer()
+	startClient()
 }
 func loadConfig() {
 	// 处理配置文件
 	config = Config{
 		ID:            DefaultID,
-		SystemPort:    DefaultSystemPort,
+		ClientPort:    DefaultClientPort,
 		ProxyPort:     DefaultProxyPort,
 		ServerAddress: DefaultServerAddress,
 		ServerPort:    DefaultServerPort,
@@ -112,14 +112,14 @@ func loadConfig() {
 		ID = config.ID
 	}
 }
-func startSystem() {
-	MonitorPort := config.SystemPort
+func startClient() {
+	ClientPort := config.ClientPort
 	for {
-		logger.Println("[INFO]", "尝试在", MonitorPort, "端口搭建控制台...")
-		l, err := net.Listen("tcp", ":"+strconv.Itoa(MonitorPort))
+		logger.Println("[INFO]", "尝试在端口", ClientPort, "搭建控制台...")
+		l, err := net.Listen("tcp", ":"+strconv.Itoa(ClientPort))
 		if err != nil {
-			logger.Println("[ERRO]", MonitorPort, "控制台被占用！")
-			MonitorPort += 1
+			logger.Println("[ERRO]", "控制台端口被占用！")
+			ClientPort += 1
 			continue
 		} else {
 			defer l.Close()
@@ -138,13 +138,13 @@ func startSystem() {
 		}
 	}
 }
-func startProxy() {
+func startProxyServer() {
 	ProxyPort = config.ProxyPort
 	for {
-		logger.Println("[INFO]", "尝试在", ProxyPort, "端口搭建代理服务器...")
+		logger.Println("[INFO]", "尝试在端口", ProxyPort, "搭建代理服务器...")
 		l, err := net.Listen("tcp", ":"+strconv.Itoa(ProxyPort))
 		if err != nil {
-			logger.Println("[ERRO]", ProxyPort, "代理服务器端口被占用！")
+			logger.Println("[ERRO]", "代理服务器端口被占用！")
 			ProxyPort += 1
 			continue
 		} else {
@@ -164,7 +164,23 @@ func startProxy() {
 		}
 	}
 }
-func connectToStar() {
+func connectToServer() {
+	ServerAddress := config.ServerAddress
+	ServerPort := config.ServerPort
+	logger.Println("[INFO]", "正在尝试连接", ServerAddress+":"+strconv.Itoa(ServerPort), "...")
+	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP(ServerAddress), Port: ServerPort})
+	if err != nil {
+		logger.Fatal(err)
+	}
+	logger.Println("[FINE]", "建立连接：", conn.LocalAddr(), "<==>", conn.RemoteAddr())
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+	UDProbe = bufio.NewReadWriter(reader, writer)
+	m := map[string]interface{}{
+		"CMD": "signup",
+		"ID":  ID,
+	}
+	WriteMap(UDProbe, m)
 }
 
 // func OLD_connectToStar() {
@@ -222,9 +238,9 @@ func handleProxy(conn net.Conn) {
 			break
 		} else {
 			logger.Println("[INFO]", "接收到App请求：", m["CMD"])
-			// if m["CMD"] == "login" {
-			// 	WriteMap(StarTCP, m)
-			// }
+			if m["CMD"] == "login" {
+				WriteMap(UDProbe, m)
+			}
 		}
 	}
 	m := map[string]interface{}{
@@ -294,7 +310,7 @@ type Config struct {
 	ID            string // Point ID ("auto"/)
 	Username      string // Username For Star/Cloud Authentication
 	Password      string // Password For Star/Cloud Authentication
-	SystemPort    int    // Port for PCS System Data
+	ClientPort    int    // Port for PCS System Data
 	ProxyPort     int    // Port for Data Transfer
 	ServerAddress string // IP address for Point Cloud Server you wish to connect to
 	ServerPort    int    // Port for Point Cloud Server you wish to connect to
