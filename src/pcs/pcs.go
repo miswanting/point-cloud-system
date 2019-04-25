@@ -21,7 +21,7 @@ const (
 	LogFile          = "pcs.log"
 	ConfigFile       = "pcs.config.json"
 	DefaultID        = "auto"
-	DefaultProxyPort = 1994
+	DefaultProxyPort = 1995
 )
 
 var (
@@ -119,14 +119,40 @@ func handleProxy(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	readwriter := bufio.NewReadWriter(reader, writer)
-	msg := ReadString(readwriter)
-	if msg == "exit" {
-	} else {
-		logger.Println("[TEST]", "接收到Star信息：", msg, "进行反弹测试！")
-		WriteString(readwriter, msg)
+	for {
+		m := ReadMap(readwriter)
+		if m["CMD"] == "close" {
+			logger.Println("[INFO]", "Star-Point连接接收到关闭信号！")
+			break
+		} else {
+			logger.Println("[INFO]", "接收到Star请求：", m["CMD"])
+			if m["CMD"] == "signup" {
+				WriteMap(readwriter, m)
+			} else if m["CMD"] == "login" {
+				WriteMap(readwriter, m)
+			}
+		}
 	}
+	m := map[string]interface{}{
+		"CMD": "close",
+	}
+	WriteMap(readwriter, m)
 	conn.Close()
-	logger.Println("[INFO]", "连接已关闭！")
+	logger.Println("[INFO]", "Star-Point连接受控关闭！")
+}
+func Str2Map(s string) (m map[string]interface{}) {
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return m
+}
+func Map2Str(m map[string]interface{}) (s string) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return string(b)
 }
 func Read(readWriter *bufio.ReadWriter) (p []byte) {
 	// BUG
@@ -141,13 +167,23 @@ func Write(readWriter *bufio.ReadWriter, p []byte) {
 	readWriter.Flush()
 }
 func ReadString(readWriter *bufio.ReadWriter) (str string) {
-	raw_msg, _ := readWriter.ReadString('\n')
+	raw_msg, err := readWriter.ReadString('\n')
+	if err != nil {
+		logger.Fatal(err)
+	}
 	msg := strings.Split(raw_msg, "\n")
 	return msg[0]
 }
 func WriteString(readWriter *bufio.ReadWriter, str string) {
 	readWriter.WriteString(str + "\n")
 	readWriter.Flush()
+}
+func ReadMap(readWriter *bufio.ReadWriter) (m map[string]interface{}) {
+	msg := ReadString(readWriter)
+	return Str2Map(msg)
+}
+func WriteMap(readWriter *bufio.ReadWriter, m map[string]interface{}) {
+	WriteString(readWriter, Map2Str(m))
 }
 func getHash() (hash string) {
 	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(), 10))

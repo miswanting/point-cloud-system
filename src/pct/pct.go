@@ -21,7 +21,7 @@ const (
 	LogFile      = "pct.log"
 	ConfigFile   = "pct.config.json"
 	ProxyAddress = "localhost"
-	ProxyPort    = 1996
+	ProxyPort    = 1994
 )
 
 var (
@@ -91,16 +91,37 @@ func startTester() {
 	writer := bufio.NewWriter(conn)
 	readwriter := bufio.NewReadWriter(reader, writer)
 	logger.Println("[TEST]", "开始测试！")
-	logger.Println("[TEST]", "发送测试消息：", "test msg abc")
-	WriteString(readwriter, "test msg abc")
-	logger.Println("[TEST]", "准备读取消息...")
-	msg := ReadString(readwriter)
-	logger.Println("[TEST]", "收到测试消息：", msg)
+	logger.Println("[TEST]", "提交登录请求...")
+	m := map[string]interface{}{
+		"CMD":      "login",
+		"Username": "abc",
+		"Password": "123",
+	}
+	WriteMap(readwriter, m)
+	logger.Println("[TEST]", "等待回应...")
+	m = ReadMap(readwriter)
+	logger.Println("[TEST]", "收到测试消息：", m)
 	logger.Println("[TEST]", "发送关闭信号...")
-	WriteString(readwriter, "exit")
+	m = map[string]interface{}{
+		"CMD": "close",
+	}
+	WriteMap(readwriter, m)
 	logger.Println("[FINE]", "测试完毕！")
 }
-
+func Str2Map(s string) (m map[string]interface{}) {
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return m
+}
+func Map2Str(m map[string]interface{}) (s string) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return string(b)
+}
 func Read(readWriter *bufio.ReadWriter) (p []byte) {
 	// BUG
 	_, err := readWriter.Read(p)
@@ -121,6 +142,13 @@ func ReadString(readWriter *bufio.ReadWriter) (str string) {
 func WriteString(readWriter *bufio.ReadWriter, str string) {
 	readWriter.WriteString(str + "\n")
 	readWriter.Flush()
+}
+func ReadMap(readWriter *bufio.ReadWriter) (m map[string]interface{}) {
+	msg := ReadString(readWriter)
+	return Str2Map(msg)
+}
+func WriteMap(readWriter *bufio.ReadWriter, m map[string]interface{}) {
+	WriteString(readWriter, Map2Str(m))
 }
 func getHash() (hash string) {
 	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(), 10))

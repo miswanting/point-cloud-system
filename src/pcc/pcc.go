@@ -24,10 +24,10 @@ const (
 	LogFile            = "pcc.log"
 	ConfigFile         = "pcc.config.json"
 	DefaultID          = "auto"
-	DefaultMonitorPort = 1995
-	DefaultProxyPort   = 1996
+	DefaultMonitorPort = 80
+	DefaultProxyPort   = 1994
 	DefaultStarAddress = "localhost"
-	DefaultStarPort    = 1994
+	DefaultStarPort    = 1995
 )
 
 var (
@@ -167,17 +167,29 @@ func connectToStar() {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	StarRW = bufio.NewReadWriter(reader, writer)
+	m := map[string]interface{}{
+		"CMD": "signup",
+		"ID":  ID,
+	}
+	WriteMap(StarRW, m)
 	for {
-		msg := ReadString(StarRW)
-		if msg == "exit" {
+		m = ReadMap(StarRW)
+		if m["CMD"] == "close" {
+			logger.Println("[INFO]", "Point-Star连接接收到关闭信号！")
 			break
 		} else {
-			logger.Println("[TEST]", "接收到Star信息：", msg, "下载至App...")
-			WriteString(AppRW, msg)
+			logger.Println("[INFO]", "接收到Star请求：", m["CMD"])
+			if m["CMD"] == "login" {
+				WriteMap(AppRW, m)
+			}
 		}
 	}
+	m = map[string]interface{}{
+		"CMD": "close",
+	}
+	WriteMap(StarRW, m)
 	conn.Close()
-	logger.Println("[INFO]", "连接受控关闭！")
+	logger.Println("[INFO]", "Point-Star连接受控关闭！")
 }
 func handleMonitor(conn net.Conn) {
 	reader := bufio.NewReader(conn)
@@ -194,16 +206,37 @@ func handleProxy(conn net.Conn) {
 	writer := bufio.NewWriter(conn)
 	AppRW = bufio.NewReadWriter(reader, writer)
 	for {
-		msg := ReadString(AppRW)
-		if msg == "exit" {
+		m := ReadMap(AppRW)
+		if m["CMD"] == "close" {
+			logger.Println("[INFO]", "Point-App连接接收到关闭信号！")
 			break
 		} else {
-			logger.Println("[TEST]", "接收到App信息：", msg, "上传至Star...")
-			WriteString(StarRW, msg)
+			logger.Println("[INFO]", "接收到App请求：", m["CMD"])
+			if m["CMD"] == "login" {
+				WriteMap(StarRW, m)
+			}
 		}
 	}
+	m := map[string]interface{}{
+		"CMD": "close",
+	}
+	WriteMap(AppRW, m)
 	conn.Close()
-	logger.Println("[INFO]", "连接受控关闭！")
+	logger.Println("[INFO]", "Point-App连接受控关闭！")
+}
+func Str2Map(s string) (m map[string]interface{}) {
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return m
+}
+func Map2Str(m map[string]interface{}) (s string) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return string(b)
 }
 func Read(readWriter *bufio.ReadWriter) (p []byte) {
 	// BUG
@@ -232,6 +265,13 @@ func WriteString(readWriter *bufio.ReadWriter, str string) {
 		logger.Fatal("[WARN]", err)
 	}
 	readWriter.Flush()
+}
+func ReadMap(readWriter *bufio.ReadWriter) (m map[string]interface{}) {
+	msg := ReadString(readWriter)
+	return Str2Map(msg)
+}
+func WriteMap(readWriter *bufio.ReadWriter, m map[string]interface{}) {
+	WriteString(readWriter, Map2Str(m))
 }
 func getHash() (hash string) {
 	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(), 10))
