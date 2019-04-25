@@ -1,5 +1,5 @@
 @echo off
-title Point Cloud System(Client)
+title Point Cloud System Client
 set GOPATH=%cd%
-go run .\src\pcc
+go run .\src\pcsc
 pause

@@ -1,7 +1,8 @@
 // 1.建立Point
-// 2.连接Star
-// 3.连接Point
-// 4.连接Cloud
+// 2.侦听三个TCP端口和一个UDP端口
+// 4.一个TCP端口用于与应用进行通信
+// 5.两个TCP端口用于与相邻点进行通信
+// 5.一个UDP端口用于多功能探针（与服务器通信/内网穿透）
 package main
 
 import (
@@ -20,47 +21,59 @@ import (
 )
 
 const (
-	Version            = "0.1.0-190424"
-	LogFile            = "pcc.log"
-	ConfigFile         = "pcc.config.json"
-	DefaultID          = "auto"
-	DefaultMonitorPort = 1995
-	DefaultProxyPort   = 1996
-	DefaultStarAddress = "localhost"
-	DefaultStarPort    = 1994
+	Version              = "0.1.0-190424"    // 当前版本号
+	LogFile              = "pcc.log"         // Log文件名
+	ConfigFile           = "pcc.config.json" // 配置文件名
+	DefaultID            = "auto"            // 默认ID（或生成方式）
+	DefaultServerAddress = "localhost"       // 默认服务器系统IP
+	DefaultServerPort    = 1995              // 默认服务器系统端口
+	DefaultSystemPort    = 80                // 默认本地系统端口
+	DefaultProxyPort     = 1996              // 默认本地代理端口
 )
 
 var (
-	logger      *log.Logger
-	config      Config
-	ID          string
-	MonitorPort int
-	ProxyPort   int
-	StarRW      *bufio.ReadWriter
-	AppRW       *bufio.ReadWriter
+	logger       *log.Logger       // 全局Logger
+	config       Config            // 全局配置信息
+	ID           string            // 客户端ID（一机一个）
+	SystemPort   int               // 系统端口
+	ProxyPort    int               // 代理端口
+	AppTCP       *bufio.ReadWriter // TCP连接App
+	NeighborTCP1 *bufio.ReadWriter // TCP连接Neighbor1
+	NeighborTCP2 *bufio.ReadWriter // TCP连接Neighbor2
+	UDProbe      *bufio.ReadWriter // UDP探针
 )
 
-func main() {
-	// 初始化
+func init() { // 初始化
 	os.Remove(LogFile) // 删除记录文件（如果有）
-	// 指定记录文件
+	// 设置记录文件
 	logFile, err := os.OpenFile(LogFile, os.O_CREATE, 0777)
 	if err != nil {
 		log.Println(err)
 	}
 	defer logFile.Close()
-	// 记录文件和控制台双通
+	// 记录文件输出和控制台输出双通
 	w := io.MultiWriter(os.Stdout, logFile)
 	logger = log.New(w, "", log.LstdFlags)
-	logger.Println("[HALO]", "Point Cloud System(PCS)", "[版本", Version+"]")
+}
+func main() {
+	logger.Println("[HALO]", "Point Cloud System Client", "[版本", Version+"]")
 	logger.Println("[HALO]", "欢迎使用点云客户端！")
+	loadConfig()
+	logger.Println("[INFO]", "使用ID:", ID)
+	// 尝试连接Star
+	go connectToStar()
+	// 启动代理服务器
+	go startProxy()
+	startSystem()
+}
+func loadConfig() {
 	// 处理配置文件
 	config = Config{
-		ID:          DefaultID,
-		MonitorPort: DefaultMonitorPort,
-		ProxyPort:   DefaultProxyPort,
-		StarAddress: DefaultStarAddress,
-		StarPort:    DefaultStarPort,
+		ID:            DefaultID,
+		SystemPort:    DefaultSystemPort,
+		ProxyPort:     DefaultProxyPort,
+		ServerAddress: DefaultServerAddress,
+		ServerPort:    DefaultServerPort,
 	}
 	logger.Println("[INFO]", "正在查找配置文件...")
 	if _, err := os.Stat(ConfigFile); err == nil {
@@ -98,15 +111,9 @@ func main() {
 	} else {
 		ID = config.ID
 	}
-	logger.Println("[INFO]", "使用ID:", ID)
-	// 尝试连接Star
-	go connectToStar()
-	// 启动代理服务器
-	go startProxy()
-	startMonitor()
 }
-func startMonitor() {
-	MonitorPort := config.MonitorPort
+func startSystem() {
+	MonitorPort := config.SystemPort
 	for {
 		logger.Println("[INFO]", "尝试在", MonitorPort, "端口搭建控制台...")
 		l, err := net.Listen("tcp", ":"+strconv.Itoa(MonitorPort))
@@ -158,29 +165,42 @@ func startProxy() {
 	}
 }
 func connectToStar() {
-	logger.Println("[INFO]", "正在尝试连接点云服务器", config.StarAddress+":"+strconv.Itoa(config.StarPort), "...")
-	conn, err := net.Dial("tcp", config.StarAddress+":"+strconv.Itoa(config.StarPort))
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("[FINE]", "建立Point-Star连接：", conn.LocalAddr(), "<==>", conn.RemoteAddr())
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
-	StarRW = bufio.NewReadWriter(reader, writer)
-	for {
-		msg := ReadString(StarRW)
-		if msg == "exit" {
-			logger.Println("[INFO]", "Point-Star连接接收到关闭信号！")
-			break
-		} else {
-			logger.Println("[TEST]", "接收到Star信息：", msg, "下载至App...")
-			WriteString(AppRW, msg)
-		}
-	}
-	WriteString(StarRW, "exit")
-	conn.Close()
-	logger.Println("[INFO]", "Point-Star连接受控关闭！")
 }
+
+// func OLD_connectToStar() {
+// 	logger.Println("[INFO]", "正在尝试连接点云服务器", config.StarAddress+":"+strconv.Itoa(config.StarPort), "...")
+// 	conn, err := net.Dial("tcp", config.StarAddress+":"+strconv.Itoa(config.StarPort))
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	log.Println("[FINE]", "建立Point-Star连接：", conn.LocalAddr(), "<==>", conn.RemoteAddr())
+// 	reader := bufio.NewReader(conn)
+// 	writer := bufio.NewWriter(conn)
+// 	StarTCP = bufio.NewReadWriter(reader, writer)
+// 	m := map[string]interface{}{
+// 		"CMD": "signup",
+// 		"ID":  ID,
+// 	}
+// 	WriteMap(StarTCP, m)
+// 	for {
+// 		m = ReadMap(StarTCP)
+// 		if m["CMD"] == "close" {
+// 			logger.Println("[INFO]", "Point-Star连接接收到关闭信号！")
+// 			break
+// 		} else {
+// 			logger.Println("[INFO]", "接收到Star请求：", m["CMD"])
+// 			if m["CMD"] == "login" {
+// 				WriteMap(AppTCP, m)
+// 			}
+// 		}
+// 	}
+// 	m = map[string]interface{}{
+// 		"CMD": "close",
+// 	}
+// 	WriteMap(StarTCP, m)
+// 	conn.Close()
+// 	logger.Println("[INFO]", "Point-Star连接受控关闭！")
+// }
 func handleMonitor(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
@@ -194,20 +214,39 @@ func handleMonitor(conn net.Conn) {
 func handleProxy(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
-	AppRW = bufio.NewReadWriter(reader, writer)
+	AppTCP = bufio.NewReadWriter(reader, writer)
 	for {
-		msg := ReadString(AppRW)
-		if msg == "exit" {
+		m := ReadMap(AppTCP)
+		if m["CMD"] == "close" {
 			logger.Println("[INFO]", "Point-App连接接收到关闭信号！")
 			break
 		} else {
-			logger.Println("[TEST]", "接收到App信息：", msg, "上传至Star...")
-			WriteString(StarRW, msg)
+			logger.Println("[INFO]", "接收到App请求：", m["CMD"])
+			// if m["CMD"] == "login" {
+			// 	WriteMap(StarTCP, m)
+			// }
 		}
 	}
-	WriteString(AppRW, "exit")
+	m := map[string]interface{}{
+		"CMD": "close",
+	}
+	WriteMap(AppTCP, m)
 	conn.Close()
 	logger.Println("[INFO]", "Point-App连接受控关闭！")
+}
+func Str2Map(s string) (m map[string]interface{}) {
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return m
+}
+func Map2Str(m map[string]interface{}) (s string) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	return string(b)
 }
 func Read(readWriter *bufio.ReadWriter) (p []byte) {
 	// BUG
@@ -237,6 +276,13 @@ func WriteString(readWriter *bufio.ReadWriter, str string) {
 	}
 	readWriter.Flush()
 }
+func ReadMap(readWriter *bufio.ReadWriter) (m map[string]interface{}) {
+	msg := ReadString(readWriter)
+	return Str2Map(msg)
+}
+func WriteMap(readWriter *bufio.ReadWriter, m map[string]interface{}) {
+	WriteString(readWriter, Map2Str(m))
+}
 func getHash() (hash string) {
 	salt := []byte(strconv.Itoa(rand.Int()) + strconv.FormatInt(time.Now().UnixNano(), 10))
 	h := strings.ToUpper(fmt.Sprintf("%x", md5.Sum(salt)))
@@ -244,20 +290,19 @@ func getHash() (hash string) {
 }
 
 type Config struct {
-	Mode        string // General Mode
-	ID          string // Point ID ("auto"/)
-	Username    string // Username For Star/Cloud Authentication
-	Password    string // Password For Star/Cloud Authentication
-	MonitorPort int    // Port for Monitoring PCS Runtime Data
-	ProxyPort   int    // Port for Data Transfer
-	StarAddress string // IP address for Point Cloud Server you wish to connect to
-	StarPort    int    // Port for Point Cloud Server you wish to connect to
+	Mode          string // General Mode
+	ID            string // Point ID ("auto"/)
+	Username      string // Username For Star/Cloud Authentication
+	Password      string // Password For Star/Cloud Authentication
+	SystemPort    int    // Port for PCS System Data
+	ProxyPort     int    // Port for Data Transfer
+	ServerAddress string // IP address for Point Cloud Server you wish to connect to
+	ServerPort    int    // Port for Point Cloud Server you wish to connect to
 }
-type PointInfo struct {
-	ID         string
-	LocalAddr  string
-	GlobalAddr string
-	Neighbors  []string
+type PointInfo struct { // 只知道Point的ID和相邻关系
+	ID        string
+	Neighbor1 string
+	Neighbor2 string
 }
 type CloudInfo struct {
 	ID     string
