@@ -33,8 +33,7 @@ var (
 	ServerPort int         // 本地服务器端口
 )
 
-func main() {
-	// 初始化
+func init() { // 初始化
 	os.Remove(LogFile) // 删除记录文件（如果有）
 	// 指定记录文件
 	logFile, err := os.OpenFile(LogFile, os.O_CREATE, 0777)
@@ -45,8 +44,10 @@ func main() {
 	// 记录文件和控制台双通
 	w := io.MultiWriter(os.Stdout, logFile)
 	logger = log.New(w, "", log.LstdFlags)
-	logger.Println("[HALO]", "Point Cloud System Server", "[版本", Version+"]")
-	logger.Println("[HALO]", "欢迎使用点云服务端！")
+}
+func main() {
+	logger.Println("[HALO]", "Point Cloud System Server", "[Version", Version+"]")
+	logger.Println("[HALO]", "Welcome")
 	// 处理配置文件
 	config = Config{
 		ID:         DefaultID,
