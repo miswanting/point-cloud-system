@@ -21,7 +21,7 @@ const (
 	LogFile      = "pct.log"
 	ConfigFile   = "pct.config.json"
 	ProxyAddress = "localhost"
-	ProxyPort    = 1994
+	ProxyPort    = 1996
 )
 
 var (
@@ -41,7 +41,7 @@ func main() {
 	// 记录文件和控制台双通
 	w := io.MultiWriter(os.Stdout, logFile)
 	logger = log.New(w, "", log.LstdFlags)
-	logger.Println("[HALO]", "Point Cloud System(PCS)", "[版本", Version+"]")
+	logger.Println("[HALO]", "Point Cloud System Tester", "[版本", Version+"]")
 	logger.Println("[HALO]", "欢迎使用点云测试程序！")
 	// 处理配置文件
 	config = Config{
