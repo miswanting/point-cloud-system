@@ -41,7 +41,7 @@ func init() { // 初始化
 	// defer logFile.Close()
 	// 记录文件输出和控制台输出双通
 	mw := io.MultiWriter(os.Stdout, logFile)
-	logger = log.New(mw, "", log.LstdFlags)
+	logger = log.New(mw, "", log.Lmicroseconds|log.Lshortfile)
 }
 func main() {
 	logger.Println("[HALO]", "Point Cloud System Tester", "[版本", Version+"]")
